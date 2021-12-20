@@ -90,12 +90,39 @@
 #define NET_DVR_DEV_ADDRESS_MAX_LEN 129
 #define NET_DVR_LOGIN_USERNAME_MAX_LEN 64
 #define NET_DVR_LOGIN_PASSWD_MAX_LEN 64
-#define MAX_DOOR_NUM                    32  //最大门数
-#define MAX_CASE_SENSOR_NUM             8   //最大case sensor触发器数
-#define MAX_CARD_READER_NUM_512            512 //最大读卡器数
 #define MAX_ALARMHOST_ALARMIN_NUM            512//网络报警主机最大报警输入口数
 #define MAX_ALARMHOST_ALARMOUT_NUM            512//网络报警主机最大报警输出口数
+
+#define HOLIDAY_GROUP_NAME_LEN          32  //假日组名称长度
+#define MAX_HOLIDAY_PLAN_NUM            16  //假日组最大假日计划数
+#define TEMPLATE_NAME_LEN               32  //计划模板名称长度
+#define MAX_HOLIDAY_GROUP_NUM           16   //计划模板最大假日组数
+#define DOOR_NAME_LEN                   32  //门名称
+#define STRESS_PASSWORD_LEN             8   //胁迫密码长度
+#define SUPER_PASSWORD_LEN              8   //胁迫密码长度
+#define GROUP_NAME_LEN                  32  //群组名称长度
+#define GROUP_COMBINATION_NUM           8   //群组组合数
+#define MULTI_CARD_GROUP_NUM            4   //单门最大多重卡组数
+#define ACS_CARD_NO_LEN                 32  //门禁卡号长度
+#define NET_SDK_EMPLOYEE_NO_LEN         32  //工号长度
+#define NET_SDK_UUID_LEN                36  //UUID长度
+#define NET_SDK_EHOME_KEY_LEN           32  //EHome Key长度
+#define CARD_PASSWORD_LEN               8   //卡密码长度
+#define MAX_DOOR_NUM                    32  //最大门数
+#define MAX_CARD_RIGHT_PLAN_NUM         4   //卡权限最大计划个数
+#define MAX_GROUP_NUM_128               128 //最大群组数
 #define MAX_CARD_READER_NUM             64  //最大读卡器数
+#define MAX_SNEAK_PATH_NODE             8   //最大后续读卡器数
+#define MAX_MULTI_DOOR_INTERLOCK_GROUP  8   //最大多门互锁组数
+#define MAX_INTER_LOCK_DOOR_NUM         8   //一个多门互锁组中最大互锁门数
+#define MAX_CASE_SENSOR_NUM             8   //最大case sensor触发器数
+#define MAX_DOOR_NUM_256                256 //最大门数
+#define MAX_READER_ROUTE_NUM            16  //最大刷卡循序路径
+#define MAX_FINGER_PRINT_NUM            10  //最大指纹个数
+#define MAX_CARD_READER_NUM_512            512 //最大读卡器数
+#define NET_SDK_MULTI_CARD_GROUP_NUM_20     20   //单门最大多重卡组数
+
+
 
 // 获取设备参数
 #define NET_DVR_GET_WEEK_PLAN_CFG               2100    //获取门状态周计划参数
@@ -189,6 +216,22 @@
 #define NET_DVR_GET_RS485_CASCADE_CFG            2198   //获取Rs485级联设备配置
 #define NET_DVR_SET_RS485_CASCADE_CFG            2199   //设置Rs485级联设备配置
 
+#define NET_DVR_GET_CARD                 2560
+#define NET_DVR_SET_CARD                 2561
+#define NET_DVR_DEL_CARD                 2562
+#define NET_DVR_GET_FINGERPRINT          2563
+#define NET_DVR_SET_FINGERPRINT          2564
+#define NET_DVR_DEL_FINGERPRINT          2565
+#define NET_DVR_GET_FACE                 2566
+#define NET_DVR_SET_FACE                 2567
+
+typedef enum
+{
+    NET_SDK_GET_NEXT_STATUS_SUCCESS = 1000,    // �ɹ���ȡ�����ݣ��ͻ��˴����걾�����ݺ���Ҫ�ٴε���NET_DVR_RemoteConfigGetNext��ȡ��һ������
+        NET_SDK_GET_NETX_STATUS_NEED_WAIT,        // ��ȴ��豸�������ݣ���������NET_DVR_RemoteConfigGetNext����
+        NET_SDK_GET_NEXT_STATUS_FINISH,            // ����ȫ��ȡ�꣬��ʱ�ͻ��˿ɵ���NET_DVR_StopRemoteConfig����������
+        NET_SDK_GET_NEXT_STATUS_FAILED,            // �����쳣���ͻ��˿ɵ���NET_DVR_StopRemoteConfig����������
+}NET_SDK_GET_NEXT_STATUS;
 
 
 #define LIGHT_PWRON        2    /* 接通灯光电源 */
@@ -456,6 +499,82 @@ typedef struct tagNET_DVR_ACS_WORK_STATUS
     BYTE byRes2[32];
 }NET_DVR_ACS_WORK_STATUS, *LPNET_DVR_ACS_WORK_STATUS;
 
+//卡参数配置条件结构体。old
+typedef struct tagNET_DVR_CARD_COND
+{
+    DWORD dwSize;
+    DWORD dwCardNum; //设置或获取卡数量，获取时置为0xffffffff表示获取所有卡信息
+    BYTE  byRes[64];
+}NET_DVR_CARD_COND, *LPNET_DVR_CARD_COND;
+
+//卡参数配置条件结构体。
+typedef struct _NET_DVR_CARD_CFG_COND
+{
+    DWORD dwSize;
+    DWORD dwCardNum; //设置或获取卡数量，获取时置为0xffffffff表示获取所有卡信息
+    BYTE  byCheckCardNo; //设备是否进行卡号校验，0-不校验，1-校验
+    BYTE           byRes1[3];
+    WORD wLocalControllerID; //就地控制器序号，表示往就地控制器下发离线卡参数，0代表是门禁主机
+    BYTE  byRes2[2];
+    DWORD dwLockID;  //锁ID
+    BYTE  byRes3[20];
+}NET_DVR_CARD_CFG_COND, *LPNET_DVR_CARD_CFG_COND;
+
+
+
+typedef struct tagNET_DVR_TIME_EX
+{
+    WORD wYear;
+    BYTE byMonth;
+    BYTE byDay;
+    BYTE byHour;
+    BYTE byMinute;
+    BYTE bySecond;
+    BYTE byRes;
+}NET_DVR_TIME_EX,*LPNET_DVR_TIME_EX;
+
+//有效期参数
+typedef struct tagNET_DVR_VALID_PERIOD_CFG
+{
+    BYTE byEnable; //使能有效期，0-不使能，1使能
+    BYTE byBeginTimeFlag;      //是否限制起始时间的标志，0-不限制，1-限制
+    BYTE byEnableTimeFlag;     //是否限制终止时间的标志，0-不限制，1-限制
+    BYTE byTimeDurationNo;     //有效期索引,从0开始（时间段通过SDK设置给锁，后续在制卡时，只需要传递有效期索引即可，以减少数据量）
+    NET_DVR_TIME_EX struBeginTime; //有效期起始时间
+    NET_DVR_TIME_EX struEndTime; //有效期结束时间
+    BYTE byTimeType; //时间类型：0-设备本地时间（默认），1-UTC时间（对于struBeginTime，struEndTime字段有效）
+    BYTE byRes2[31];
+}NET_DVR_VALID_PERIOD_CFG, *LPNET_DVR_VALID_PERIOD_CFG;
+
+//返回卡信息结构体
+typedef struct _NET_DVR_CARD_RECORD
+{
+    DWORD                      dwSize;
+    BYTE                        byCardNo[ACS_CARD_NO_LEN];
+    BYTE                        byCardType;
+    BYTE                        byLeaderCard;
+    BYTE                        byUserType;
+    BYTE                        byRes1;
+    BYTE                        byDoorRight[MAX_DOOR_NUM_256];
+    NET_DVR_VALID_PERIOD_CFG    struValid;
+    BYTE                        byBelongGroup[MAX_GROUP_NUM_128];
+    BYTE                        byCardPassword[CARD_PASSWORD_LEN];
+    WORD                        wCardRightPlan[MAX_DOOR_NUM_256];
+    DWORD                       dwMaxSwipeTimes;
+    DWORD                       dwSwipeTimes;
+    DWORD                       dwEmployeeNo;
+    BYTE                        byName[NAME_LEN];
+    //按位表示，0-无权限，1-有权限
+    //第0位表示：弱电报警
+    //第1位表示：开门提示音
+    //第2位表示：限制客卡
+    //第3位表示：通道
+    //第4位表示：反锁开门
+    //第5位表示：巡更功能
+    DWORD                      dwCardRight;
+    BYTE                       byRes[256];
+}NET_DVR_CARD_RECORD, *LPNET_DVR_CARD_RECORD;
+
 
 BOOL NET_DVR_Init();
 BOOL NET_DVR_Cleanup();
@@ -500,6 +619,16 @@ BOOL NET_DVR_GetDVRConfig(LONG lUserID, DWORD dwCommand,LONG lChannel, LPVOID lp
 //控制门状态
 BOOL NET_DVR_ControlGateway(LONG lUserID, LONG lGatewayIndex, DWORD dwStaic);
 
+//建立长连接
+typedef void(CALLBACK *fRemoteConfigCallback)(DWORD dwType, void* lpBuffer, DWORD dwBufLen, void* pUserData);
+ LONG  NET_DVR_StartRemoteConfig(LONG lUserID, DWORD dwCommand, LPVOID lpInBuffer, DWORD dwInBufferLen, fRemoteConfigCallback cbStateCallback, LPVOID pUserData);
+ BOOL  NET_DVR_StopRemoteConfig(LONG lHandle);
+ LONG  NET_DVR_GetNextRemoteConfig(LONG lHandle, void* lpOutBuff, DWORD dwOutBuffSize);
+ BOOL  NET_DVR_GetRemoteConfigState(LONG lHandle, void *pState);
+ BOOL  NET_DVR_SendRemoteConfig(LONG lHandle, DWORD dwDataType, char *pSendBuf, DWORD dwBufSize);
+ LONG  NET_DVR_SendWithRecvRemoteConfig(LONG lHandle, void* lpInBuff, DWORD dwInBuffSize, void* lpOutBuff, DWORD dwOutBuffSize, DWORD *dwOutDataLen);
+
+//获取错误码
 DWORD NET_DVR_GetLastError();
 
 #endif

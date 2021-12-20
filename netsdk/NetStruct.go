@@ -156,3 +156,61 @@ type NET_DVR_ACS_WORK_STATUS struct {
 	ST_dwCardNum                       DWORD     //已添加的卡数量
 	ST_byRes2                          [32]BYTE  //保留，置为0
 }
+
+//-----------获取卡参数结构体-------------------------------//
+
+// NET_DVR_CARD_COND 获取卡参数配置条件结构体。old
+type NET_DVR_CARD_COND struct {
+	ST_dwSize    DWORD
+	ST_dwCardNum DWORD
+	ST_byRes     [64]BYTE
+}
+
+// NET_DVR_CARD_RECORD 返回卡信息结构体
+type NET_DVR_CARD_RECORD struct {
+	dwSize     DWORD    //结构体大小
+	byCardNo   [32]BYTE //卡号
+	byCardType BYTE     /*卡类型：1- 普通卡（默认），2- 残障人士卡，3- 禁止名单卡，4- 巡
+	更卡，5- 胁迫卡，6- 超级卡，7- 来宾卡，8- 解除卡，9- 员工卡，10- 应急卡，11- 应急管理卡（用
+	于授权临时卡权限，本身不能开门），默认普通卡*/
+	byLeaderCard BYTE /*是否为首卡：1- 是，0- 否*/
+	byUserType   BYTE //用户类型：0 – 普通用户 1- 管理员用户
+	byRes1       BYTE
+	byDoorRight  [256]BYTE /*门权限（梯控的楼层权限、锁权限），按字节
+	表示，1-为有权限，0-为无权限，从低位到高位依次表示对门（或者梯控楼层、锁）1-N 是否有权限	*/
+	struValid     NET_DVR_VALID_PERIOD_CFG /*有效期参数（有效时间跨度为 1970 年 1 月 1 日 0 点 0 分 0 秒~2037 年 12 月 31 日 23 点 59 分 59 秒）*/
+	byBelongGroup [128]BYTE                /*所属群组，按字节表示，1-属于，0-不
+	属于，从低位到高位表示是否从属群组 1~N*/
+	byCardPassword [8]BYTE   //卡密码
+	wCardRightPlan [256]WORD /*卡权限计划，取值为计划模板编号，同个
+	门（锁）不同计划模板采用权限或的方式处理 */
+	dwMaxSwipeTimes DWORD    //最大刷卡次数，0 为无次数限制
+	dwSwipeTimes    DWORD    //已刷卡次数
+	dwEmployeeNo    DWORD    //工号（用户 ID），1~99999999，不能以 0 开头且不能重复
+	byName          [32]BYTE //姓名
+	dwCardRight     DWORD    //卡权限
+	byRes           [256]BYTE
+}
+
+//NET_DVR_VALID_PERIOD_CFG 有效期参数结构体
+type NET_DVR_VALID_PERIOD_CFG struct {
+	byEnable         BYTE            //使能有效期，0-不使能，1使能
+	byBeginTimeFlag  BYTE            //是否限制起始时间的标志，0-不限制，1-限制
+	byEnableTimeFlag BYTE            //是否限制终止时间的标志，0-不限制，1-限制
+	byTimeDurationNo BYTE            //有效期索引,从0开始（时间段通过SDK设置给锁，后续在制卡时，只需要传递有效期索引即可，以减少数据量）
+	struBeginTime    NET_DVR_TIME_EX //有效期起始时间
+	struEndTime      NET_DVR_TIME_EX //有效期结束时间
+	byTimeType       BYTE            //时间类型：0-设备本地时间（默认），1-UTC时间（对于struBeginTime，struEndTime字段有效）
+	byRes2           [31]BYTE
+}
+
+// NET_DVR_TIME_EX 时间参数结构体扩展
+type NET_DVR_TIME_EX struct {
+	ST_wYear    WORD //年
+	ST_byMonth  BYTE //月
+	ST_byDay    BYTE //日
+	ST_byHour   BYTE //时
+	ST_byMinute BYTE //分
+	ST_bySecond BYTE //秒
+	byRes       BYTE
+}

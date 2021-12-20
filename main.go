@@ -56,6 +56,7 @@ func main() {
 		fmt.Println("********请选择功能********")
 		fmt.Println("*      1、查询门状态     *")
 		fmt.Println("*      2、控制门          *")
+		fmt.Println("*      3、查询卡          *")
 		fmt.Println("*      q、退出           *")
 		fmt.Println("**************************")
 		fmt.Scanln(&signal)
@@ -82,6 +83,12 @@ func main() {
 			} else {
 				fmt.Println("执行操作成功")
 			}
+		case "3":
+			cardInfo, err := netsdk.GetCardInfo(userID)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(cardInfo)
 		case "q":
 			fmt.Println("退出登录")
 			return

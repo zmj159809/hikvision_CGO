@@ -191,3 +191,58 @@ func ControlDoor(uid int32, DoorIndex int32, ctrl uint32) error {
 	}
 	return nil
 }
+
+// GetCardInfo 获取门禁设备下的卡信息
+func GetCardInfo(uid int32) (map[string]string, error) {
+	var getcard NET_DVR_CARD_COND
+	getcard.ST_dwSize = DWORD(unsafe.Sizeof(NET_DVR_CARD_COND{}))
+	getcard.ST_dwCardNum = 0xffffffff
+	cardInfo := make(map[string]string)
+
+	var CardStruct C.NET_DVR_CARD_RECORD
+	var cardStruct NET_DVR_CARD_RECORD
+	//var userDate byte
+	//建立长连接
+	ret1 := C.NET_DVR_StartRemoteConfig(C.LONG(uid), C.NET_DVR_GET_CARD, (C.LPVOID)(unsafe.Pointer(&getcard)), C.DWORD(unsafe.Sizeof(NET_DVR_CARD_COND{})), nil, nil)
+	if int32(ret1) < 0 {
+		if err := isErr("StartRemoteConfig"); err != nil {
+			return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		}
+		return cardInfo, errors.New(fmt.Sprintf("GetCard Info error，uid :%d", uid))
+	}
+
+	//循环获取卡数据
+	for {
+		ret2 := int32(C.NET_DVR_GetNextRemoteConfig(ret1, unsafe.Pointer(&CardStruct), C.DWORD(1300)))
+		//fmt.Println(*(*NET_DVR_CARD_RECORD)(unsafe.Pointer(&CardStruct)))
+		//fmt.Println(unsafe.Sizeof(NET_DVR_CARD_RECORD{}))
+		//fmt.Println("NET_DVR_GetNextRemoteConfig 返回结果",ret2)
+		if int64(ret2) < 0 {
+			if err := isErr("GetNextRemoteConfig1"); err != nil {
+				return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+			}
+			return cardInfo, errors.New(fmt.Sprintf("GetCard Info error，uid :%d", uid))
+		}
+		if ret2 == 1000 {
+			cardStruct = *(*NET_DVR_CARD_RECORD)(unsafe.Pointer(&CardStruct))
+			cardInfo[string(cardStruct.byCardNo[:])] = string(cardStruct.byName[:])
+			fmt.Println(cardInfo)
+			continue
+		}
+		if ret2 == 1001 {
+			continue
+		}
+		if ret2 == 1002 {
+			ret3 := C.NET_DVR_StopRemoteConfig(ret1)
+			if int32(ret3) == 0 {
+				if err := isErr("GetNextRemoteConfig"); err != nil {
+					return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+				}
+				return cardInfo, errors.New(fmt.Sprintf("Control door error，uid :%d", uid))
+			}
+			return cardInfo, nil
+		}
+
+	}
+
+}
