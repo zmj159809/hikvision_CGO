@@ -214,3 +214,24 @@ type NET_DVR_TIME_EX struct {
 	ST_bySecond BYTE //秒
 	byRes       BYTE
 }
+
+//----------------------获取报警主机防区状态参数------------------------//
+type NET_DVR_ALARMHOST_MAIN_STATUS_V51 struct {
+	ST_dwSize                  DWORD
+	ST_bySetupAlarmStatus      [512]BYTE //防区布防状态，(最大支持512个防区查询)，0xff-无效，0-对应防区处于撤防状态，1-对应防区处于布防状态，2-对应防区处于布防中
+	ST_byAlarmInStatus         [512]BYTE //防区报警状态（触发状态），(最大支持512个防区查询)，0xff-无效，0-对应防区当前无报警，1-对应防区当前有报警
+	ST_byAlarmOutStatus        [512]BYTE //触发器状态，(最大支持512个触发器查询)，0xff-无效，0-对应触发器无报警，1-对应触发器有报警，2-未关联，3-离线，4-心跳异常
+	ST_byBypassStatus          [512]BYTE //防区旁路状态，数组下标表示0对应防区1，0xff-无效，0-表示防区没有旁路 1-表示防区旁路
+	ST_bySubSystemGuardStatus  [32]BYTE  //子系统布防状态，0xff-无效，0-对应子系统处于撤防状态，1-对应子系统处于布防状态，2-对应子系统处于布防中
+	ST_byAlarmInFaultStatus    [512]BYTE //防区故障状态，0xff-无效，0-对应防区处于正常状态，1-对应防区处于故障状态
+	ST_byAlarmInMemoryStatus   [512]BYTE //防区报警记忆状态（报警状态）， 0xff-无效，0-对应防区当前无报警，1-对应防区当前有报警
+	ST_byAlarmInTamperStatus   [512]BYTE //防区防拆状态，0xff-无效，0-对应防区无报警，1-对应防区有报警
+	ST_byEnableSubSystem       [32]BYTE  //子系统启用状态，0-无效，1-对应子系统未启用，2-对应子系统启用
+	ST_bySubSystemGuardType    [32]BYTE  //子系统布防类型，0-无效，1-外出布防，2-即时布防，3-在家布防
+	ST_bySubSystemAlarm        [32]BYTE  //子系统报警状态，0-无效，1-正常，2-报警
+	ST_byAlarmOutCharge        [512]BYTE //触发器电量状态，(最大支持512个触发器查询)，0-无效，1-正常，2-电量低
+	ST_byAlarmOutTamperStatus  [512]BYTE //触发器防拆状态，(最大支持512个触发器查询)，0-无效，1-防拆，2-无防拆
+	ST_byAlarmInShieldedStatus [512]BYTE //防区屏蔽状态，0-无效，1-屏蔽，2-非屏蔽
+	ST_byAlarmOutLinkage       [512]BYTE //触发器联动事件类型，(最大支持512个触发器查询)，0-无效，1-报警，2-布防，3-撤防，4-手动控制
+	ST_byRes                   [512]BYTE //保留字节
+}

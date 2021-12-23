@@ -243,3 +243,22 @@ func GetCardInfo(uid int32) (map[string]string, error) {
 	}
 
 }
+
+func GetAlarmHostMainStatus(uid int32) (NET_DVR_ALARMHOST_MAIN_STATUS_V51, error) {
+
+	var AlarmHostStatus C.NET_DVR_ALARMHOST_MAIN_STATUS_V51
+	var lpBytesReturned C.DWORD
+	ret := C.NET_DVR_GetDVRConfig(C.LONG(uid), C.NET_DVR_GET_ACS_WORK_STATUS, C.LONG(0xFFFFFFF), (C.LPVOID)(unsafe.Pointer(&AlarmHostStatus)), (C.DWORD)(unsafe.Sizeof(NET_DVR_ALARMHOST_MAIN_STATUS_V51{})), (C.LPDWORD)(&lpBytesReturned))
+
+	var AStatus NET_DVR_ALARMHOST_MAIN_STATUS_V51
+	AStatus = *(*NET_DVR_ALARMHOST_MAIN_STATUS_V51)(unsafe.Pointer(&AlarmHostStatus))
+
+	if int32(ret) == 0 {
+		if err := isErr("Get door status"); err != nil {
+			return AStatus, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		}
+		return AStatus, errors.New(fmt.Sprintf("get door status error，uid :%d", uid))
+	}
+
+	return AStatus, nil
+}

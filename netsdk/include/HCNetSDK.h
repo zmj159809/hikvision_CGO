@@ -92,6 +92,7 @@
 #define NET_DVR_LOGIN_PASSWD_MAX_LEN 64
 #define MAX_ALARMHOST_ALARMIN_NUM            512//网络报警主机最大报警输入口数
 #define MAX_ALARMHOST_ALARMOUT_NUM            512//网络报警主机最大报警输出口数
+#define MAX_ALARMHOST_SUBSYSTEM             32//报警主机最大子系统数
 
 #define HOLIDAY_GROUP_NAME_LEN          32  //假日组名称长度
 #define MAX_HOLIDAY_PLAN_NUM            16  //假日组最大假日计划数
@@ -123,7 +124,8 @@
 #define NET_SDK_MULTI_CARD_GROUP_NUM_20     20   //单门最大多重卡组数
 
 
-
+#define NET_DVR_GET_ALARMHOST_MAIN_STATUS_V40    2072   // 获取主要状态V40
+#define NET_DVR_GET_ALARMHOST_MAIN_STATUS_V51    2083   // 获取主要状态V51
 // 获取设备参数
 #define NET_DVR_GET_WEEK_PLAN_CFG               2100    //获取门状态周计划参数
 #define NET_DVR_SET_WEEK_PLAN_CFG               2101    //设置门状态周计划参数
@@ -224,6 +226,8 @@
 #define NET_DVR_DEL_FINGERPRINT          2565
 #define NET_DVR_GET_FACE                 2566
 #define NET_DVR_SET_FACE                 2567
+
+
 
 typedef enum
 {
@@ -521,7 +525,7 @@ typedef struct _NET_DVR_CARD_CFG_COND
 }NET_DVR_CARD_CFG_COND, *LPNET_DVR_CARD_CFG_COND;
 
 
-
+//时间EX
 typedef struct tagNET_DVR_TIME_EX
 {
     WORD wYear;
@@ -575,6 +579,27 @@ typedef struct _NET_DVR_CARD_RECORD
     BYTE                       byRes[256];
 }NET_DVR_CARD_RECORD, *LPNET_DVR_CARD_RECORD;
 
+typedef struct tagNET_DVR_ALARMHOST_MAIN_STATUS_V51
+{
+    DWORD  dwSize;
+    BYTE   bySetupAlarmStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区布防状态，(最大支持512个防区查询)，0xff-无效，0-对应防区处于撤防状态，1-对应防区处于布防状态，2-对应防区处于布防中
+    BYTE   byAlarmInStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区报警状态（触发状态），(最大支持512个防区查询)，0xff-无效，0-对应防区当前无报警，1-对应防区当前有报警
+    BYTE   byAlarmOutStatus[MAX_ALARMHOST_ALARMOUT_NUM]; //触发器状态，(最大支持512个触发器查询)，0xff-无效，0-对应触发器无报警，1-对应触发器有报警，2-未关联，3-离线，4-心跳异常
+    BYTE   byBypassStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区旁路状态，数组下标表示0对应防区1，0xff-无效，0-表示防区没有旁路 1-表示防区旁路
+    BYTE   bySubSystemGuardStatus[MAX_ALARMHOST_SUBSYSTEM/*32*/]; //子系统布防状态，0xff-无效，0-对应子系统处于撤防状态，1-对应子系统处于布防状态，2-对应子系统处于布防中
+    BYTE   byAlarmInFaultStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区故障状态，0xff-无效，0-对应防区处于正常状态，1-对应防区处于故障状态
+    BYTE   byAlarmInMemoryStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区报警记忆状态（报警状态）， 0xff-无效，0-对应防区当前无报警，1-对应防区当前有报警
+    BYTE   byAlarmInTamperStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区防拆状态，0xff-无效，0-对应防区无报警，1-对应防区有报警
+    BYTE   byEnableSubSystem[MAX_ALARMHOST_SUBSYSTEM/*32*/]; //子系统启用状态，0-无效，1-对应子系统未启用，2-对应子系统启用
+    BYTE   bySubSystemGuardType[MAX_ALARMHOST_SUBSYSTEM]; //子系统布防类型，0-无效，1-外出布防，2-即时布防，3-在家布防
+    BYTE   bySubSystemAlarm[MAX_ALARMHOST_SUBSYSTEM]; //子系统报警状态，0-无效，1-正常，2-报警
+    BYTE   byAlarmOutCharge[MAX_ALARMHOST_ALARMOUT_NUM]; //触发器电量状态，(最大支持512个触发器查询)，0-无效，1-正常，2-电量低
+    BYTE   byAlarmOutTamperStatus[MAX_ALARMHOST_ALARMOUT_NUM]; //触发器防拆状态，(最大支持512个触发器查询)，0-无效，1-防拆，2-无防拆
+    BYTE   byAlarmInShieldedStatus[MAX_ALARMHOST_ALARMIN_NUM]; //防区屏蔽状态，0-无效，1-屏蔽，2-非屏蔽
+    BYTE   byAlarmOutLinkage[MAX_ALARMHOST_ALARMOUT_NUM]; //触发器联动事件类型，(最大支持512个触发器查询)，0-无效，1-报警，2-布防，3-撤防，4-手动控制
+    BYTE   byRes[512]; //保留字节
+}NET_DVR_ALARMHOST_MAIN_STATUS_V51, *LPNET_DVR_ALARMHOST_MAIN_STATUS_V51;
+
 
 BOOL NET_DVR_Init();
 BOOL NET_DVR_Cleanup();
@@ -613,7 +638,7 @@ BOOL NET_DVR_CloseAlarmChan_V30(LONG lAlarmHandle);
 typedef BOOL (CALLBACK *MSGCallBack_V31)(LONG lCommand, NET_DVR_ALARMER *pAlarmer, char *pAlarmInfo, DWORD dwBufLen, void* pUser);
 BOOL NET_DVR_SetDVRMessageCallBack_V31(MSGCallBack_V31 fMessageCallBack, void* pUser);
 
-//获取门禁状态
+//获取设备状态
 BOOL NET_DVR_GetDVRConfig(LONG lUserID, DWORD dwCommand,LONG lChannel, LPVOID lpOutBuffer, DWORD dwOutBufferSize, LPDWORD lpBytesReturned);
 
 //控制门状态

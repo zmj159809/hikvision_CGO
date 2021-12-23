@@ -42,23 +42,16 @@ func main() {
 	}
 	fmt.Println("注册回调函数成功")
 
-	//布防
-	DefenceId, err := netsdk.DoDefence(userID)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(DefenceId)
-	defer netsdk.CloseDefence(DefenceId)
-
 	var signal string
-
+	var DefenceIds []int32
 	for {
 
 		fmt.Println("********请选择功能********")
 		fmt.Println("*      1、查询门状态     *")
 		fmt.Println("*      2、控制门          *")
 		fmt.Println("*      3、查询卡          *")
+		fmt.Println("*      4、查询防区状态    *")
+		fmt.Println("*      5、布防           *")
 		fmt.Println("*      q、退出           *")
 		fmt.Println("**************************")
 		fmt.Scanln(&signal)
@@ -91,7 +84,30 @@ func main() {
 				fmt.Println(err)
 			}
 			fmt.Println(cardInfo)
+		case "4":
+			Astatus, err := netsdk.GetAlarmHostMainStatus(userID)
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				fmt.Println(Astatus.ST_byAlarmInMemoryStatus)
+				fmt.Println("状态全部内容")
+				fmt.Println(Astatus)
+			}
+		case "5":
+			//布防
+			DefenceId, err := netsdk.DoDefence(userID)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			DefenceIds = append(DefenceIds, DefenceId)
+			fmt.Println(DefenceId)
+
 		case "q":
+			//撤防
+			for _, v := range DefenceIds {
+				netsdk.CloseDefence(v)
+			}
 			fmt.Println("退出登录")
 			return
 		default:
