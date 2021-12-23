@@ -239,6 +239,16 @@ func GetCardInfo(uid int32) (map[string]string, error) {
 			}
 			return cardInfo, nil
 		}
+		if ret2 == 1003 {
+			ret3 := C.NET_DVR_StopRemoteConfig(ret1)
+			if int32(ret3) == 0 {
+				if err := isErr("GetNextRemoteConfig"); err != nil {
+					return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+				}
+				return cardInfo, errors.New(fmt.Sprintf("Control door error，uid :%d", uid))
+			}
+			return cardInfo, nil
+		}
 
 	}
 
