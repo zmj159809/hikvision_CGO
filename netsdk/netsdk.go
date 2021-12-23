@@ -14,18 +14,15 @@ static int ST_Defence(int uid);
 extern int MessageCallback(LONG lCommand, NET_DVR_ALARMER *pAlarmer, char *pAlarmInfo, DWORD dwBufLen, void* pUser);
 
 int ST_Defence(int uid1){
-	int ret =-1;
+
 	NET_DVR_SETUPALARM_PARAM struSetupParam={0};
 	struSetupParam.dwSize=sizeof(NET_DVR_SETUPALARM_PARAM);
     struSetupParam.byDeployType = 1;//设置布防类型为实时布防
 
 	LONG mHandle = NET_DVR_SetupAlarmChan_V41(uid1,&struSetupParam);
-	if (mHandle<0){
-	  return ret;
-	}
-	ret = 0;
 
-    return ret;
+
+    return mHandle;
 }
 */
 import "C"
@@ -159,7 +156,7 @@ func SetDVRMessCallBack(dwUser ObjectId) error {
 		//注册失败
 		return errors.New("注册回调函数失败")
 	}
-	fmt.Println("注册回调函数成功")
+
 	return nil
 }
 

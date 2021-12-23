@@ -40,6 +40,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println("注册回调函数成功")
 
 	//布防
 	DefenceId, err := netsdk.DoDefence(userID)
@@ -47,6 +48,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println(DefenceId)
 	defer netsdk.CloseDefence(DefenceId)
 
 	var signal string
