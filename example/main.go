@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"hikvision_CGO/netsdk"
+	"github.com/zmj159809/hikvision_CGO/netsdk"
 	"unsafe"
 )
 
@@ -13,7 +13,7 @@ var (
 	password = flag.String("psw", "ly123456", "password")
 )
 
-type ST_fMessCallBack struct {
+type MessCallBack struct {
 }
 
 func main() {
@@ -29,10 +29,15 @@ func main() {
 		return
 	}
 	fmt.Println("登陆成功，userID ： ", userID)
-	defer netsdk.NetLogout(userID)
+	defer func() {
+		err = netsdk.NetLogout(userID)
+		if err != nil {
+			panic(fmt.Sprintf("logout err ：%v", err))
+		}
+	}()
 
 	//注册回调函数
-	eventCB := &ST_fMessCallBack{}
+	eventCB := &MessCallBack{}
 	eventCBId := netsdk.NewObjectId(eventCB)
 	fmt.Println(eventCBId)
 	err = netsdk.SetDVRMessCallBack(eventCBId)
@@ -54,24 +59,23 @@ func main() {
 		fmt.Println("*      5、布防           *")
 		fmt.Println("*      q、退出           *")
 		fmt.Println("**************************")
-		fmt.Scanln(&signal)
+		_, _ = fmt.Scanln(&signal)
 		switch signal {
 		case "1":
-			status, err := netsdk.GetDoorStatus(userID)
+			var status netsdk.NET_DVR_ACS_WORK_STATUS
+			err := netsdk.GetDoorStatus(userID, unsafe.Pointer(&status))
 			if err != nil {
 				fmt.Println(err)
 			} else {
 				fmt.Println(status.ST_byMagneticStatus)
-				fmt.Println("状态全部内容")
-				fmt.Println(status)
 			}
 		case "2":
 			var doorIndex int32
 			var ctrl uint32
 			fmt.Println("请输入控制门的编号")
-			fmt.Scanln(&doorIndex)
+			_, _ = fmt.Scanln(&doorIndex)
 			fmt.Println("请选择操(0- 关闭，1- 打开，2 -常开，3- 常关)")
-			fmt.Scanln(&ctrl)
+			_, _ = fmt.Scanln(&ctrl)
 			err := netsdk.ControlDoor(userID, doorIndex, ctrl)
 			if err != nil {
 				fmt.Println(err)
@@ -83,15 +87,20 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			}
-			fmt.Println(cardInfo)
+			for k, v := range cardInfo {
+				fmt.Printf("CardNo: %s | UserName : %s \n", k, v)
+			}
+
 		case "4":
-			Astatus, err := netsdk.GetAlarmHostMainStatus(userID)
+			var AStatus netsdk.NET_DVR_ALARMHOST_MAIN_STATUS_V51
+			err := netsdk.GetAlarmHostMainStatus(userID, unsafe.Pointer(&AStatus))
 			if err != nil {
 				fmt.Println(err)
 			} else {
-				fmt.Println(Astatus.ST_byAlarmInMemoryStatus)
-				fmt.Println("状态全部内容")
-				fmt.Println(Astatus)
+				fmt.Println("512个防区状态(0xff-无效，0-对应防区当前无报警，1-对应防区当前有报警)：")
+				fmt.Println(AStatus.ST_byAlarmInMemoryStatus)
+				//fmt.Println("状态全部内容")
+				//fmt.Println(AStatus)
 			}
 		case "5":
 			//布防
@@ -101,26 +110,24 @@ func main() {
 				return
 			}
 			DefenceIds = append(DefenceIds, DefenceId)
-			fmt.Println(DefenceId)
+			fmt.Println("布防成功  防区id:", DefenceId)
 
 		case "q":
 			//撤防
 			for _, v := range DefenceIds {
 				netsdk.CloseDefence(v)
 			}
-			fmt.Println("退出登录")
+			DefenceIds = make([]int32, 0)
+			fmt.Println("退出成功")
 			return
 		default:
 			fmt.Println("输入有误，请重新输入")
-
 		}
-
 	}
-
 }
 
 // Invoke 回调函数返回信息处理
-func (p *ST_fMessCallBack) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Pointer, dwBufLen int) bool {
+func (p *MessCallBack) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Pointer, dwBufLen int) bool {
 
 	fmt.Println(lCommand, ip, pAlarmInfo, dwBufLen)
 	if lCommand == netsdk.COMM_ALARM_ACS {
@@ -136,15 +143,21 @@ func (p *ST_fMessCallBack) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Poi
 			AlarmInfo.ST_struTime.ST_dwSecond,
 		)
 
-		fmt.Println("主类型：", AlarmInfo.ST_dwMajor)
-		fmt.Println("次类型：", AlarmInfo.ST_dwMinor)
+		fmt.Println("主类型：", AlarmInfo.ST_dwMajor.GetMajorString())
+		fmt.Println("次类型：", AlarmInfo.ST_dwMinor.GetMinorString(AlarmInfo.ST_dwMajor))
 		fmt.Println("报警IP：", ip)
-		fmt.Println("卡号为：", AlarmInfo.ST_struAcsEventInfo.ST_byCardNo)
-		fmt.Println("工号为：", AlarmInfo.ST_struAcsEventInfo.ST_dwEmployeeNo)
-		if AlarmInfo.ST_byAcsEventInfoExtend == 1 {
-			ExtendInfo := *(*netsdk.NET_DVR_ACS_EVENT_INFO_EXTEND)(AlarmInfo.ST_pAcsEventInfoExtend)
-			fmt.Println("门禁主机扩展事件信息 ： ", ExtendInfo)
+		var cardNo string
+		for k, v := range AlarmInfo.ST_struAcsEventInfo.ST_byCardNo {
+			if v == 0 {
+				cardNo = string(AlarmInfo.ST_struAcsEventInfo.ST_byCardNo[:k])
+			}
 		}
+		fmt.Println("卡号为：", cardNo)
+		fmt.Println("工号为：", fmt.Sprint(AlarmInfo.ST_struAcsEventInfo.ST_dwEmployeeNo))
+		//if AlarmInfo.ST_byAcsEventInfoExtend == 1 {
+		//	ExtendInfo := *(*netsdk.NET_DVR_ACS_EVENT_INFO_EXTEND)(AlarmInfo.ST_pAcsEventInfoExtend)
+		//	fmt.Println("门禁主机扩展事件信息 ： ", ExtendInfo)
+		//}
 	}
 	return true
 }
