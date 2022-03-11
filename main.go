@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"hkdoorSDK/netsdk"
+	"hikvision_CGO/netsdk"
 	"unsafe"
 )
 
