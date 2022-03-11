@@ -1,3 +1,3 @@
-module hkdoorSDK
+module hikvision_CGO
 
 go 1.16
