@@ -1,9 +1,13 @@
+// Package netsdk 提供用于在linux环境 golang直接调用海康的sdk。
+// 详细用法参见示例代码。
 package netsdk
 
 /*
 #cgo CFLAGS:  -I./include
+//运行时链接
 #cgo LDFLAGS: -L./lib/Linux -lhcnetsdk
-#cgo LDFLAGS: -Wl,-rpath=./lib/Linux:./lib/Linux/HCNetSDK
+//编译时链接
+#cgo LDFLAGS: -Wl,-rpath=./lib/Linux:./lib/Linux/HCNetSDKCom
 
 #include "HCNetSDK.h"
 #include <unistd.h>
@@ -11,8 +15,9 @@ package netsdk
 #include <stdlib.h>
 #include <stdio.h>
 static int ST_Defence(int uid);
-extern int MessageCallback(LONG lCommand, NET_DVR_ALARMER *pAlarmer, char *pAlarmInfo, DWORD dwBufLen, void* pUser);
+extern int MessageCallback(LONG lCommand, NET_DVR_ALARMER *pAlarmer, char *pAlarmInfo, DWORD dwBufLen, void* pUser); //回调函数声明 golang实现
 
+//ST_Defence golang要转换数据很麻烦,直接用C写了
 int ST_Defence(int uid1){
 
 	NET_DVR_SETUPALARM_PARAM struSetupParam={0};
@@ -61,14 +66,6 @@ func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAla
 	obj := id.Get()
 	Alarm := *(*NET_DVR_ALARMER)(unsafe.Pointer(pAlarmer))
 	ip := Alarm.ST_sDeviceIP
-	// TODO: 不确定的修改
-	//var ipStr string
-	//for k, v := range ip {
-	//	if v == 0 {
-	//		ipStr = string(ip[:k])
-	//		break
-	//	}
-	//}
 
 	ipStr := C.GoString((*C.char)(unsafe.Pointer(&ip[0])))
 
@@ -117,6 +114,8 @@ func NetInit(sdkLog string, ifSdkLog bool) error {
 }
 
 // NetLoginV40 登录
+// deviceIp 设备IP地址 username  用户名 password 密码
+// 示例： NetLoginV40("192.168.1.64", "admin", "12345")
 func NetLoginV40(deviceIp, username, password string) (int32, error) {
 	var userLoginInfo C.NET_DVR_USER_LOGIN_INFO
 	var deviceInfo C.NET_DVR_DEVICEINFO_V40
@@ -149,6 +148,8 @@ func NetLoginV40(deviceIp, username, password string) (int32, error) {
 }
 
 // isErr  获取上一个发生的错误
+// operation  操作名称
+// 示例：isErr("Login")
 func isErr(operation string) error {
 	errno := int64(C.NET_DVR_GetLastError())
 	if errno > 0 {
@@ -159,6 +160,8 @@ func isErr(operation string) error {
 }
 
 // NetLogout 退出登录
+// uid  用户ID 由NetLoginV40函数返回
+// 示例：NetLogout(uid)
 func NetLogout(uid int32) error {
 	C.NET_DVR_Logout_V30(C.LONG(uid))
 	if err := isErr("Logout"); err != nil {
@@ -197,22 +200,27 @@ func GetDoorStatus(uid int32, pBuf *NET_DVR_ACS_WORK_STATUS) (err error) {
 }
 
 // DoDefence 布防
+// uid 用户ID 由NetLoginV40函数返回
 func DoDefence(uid int32) (int32, error) {
 	ret := C.ST_Defence(C.int(uid))
 	if int32(ret) == -1 {
 		err := isErr("布防")
 		return int32(ret), err
 	}
-	fmt.Println("布防成功")
+	log.Println("布防成功")
 	return int32(ret), nil
 }
 
 // CloseDefence 撤防
+// dId 布防ID 由DoDefence函数返回
 func CloseDefence(dId int32) {
 	C.NET_DVR_CloseAlarmChan_V30(C.int(dId))
 }
 
-// ControlDoor 控制门状态 0- 关闭，1- 打开），2- 常开），3- 常关，
+// ControlDoor 控制门状态
+// uid 用户ID 由NetLoginV40函数返回
+// ctrl 控制命令，0- 关闭，1- 打开），2- 常开），3- 常关，
+// DoorIndex 门编号，从0开始  对应的是 NET_DVR_ACS_WORK_STATUS.ST_byMagneticStatus 数组中的第几位门
 func ControlDoor(uid int32, DoorIndex int32, ctrl uint32) error {
 	defer func() {
 		if e := recover(); e != nil {
@@ -230,6 +238,7 @@ func ControlDoor(uid int32, DoorIndex int32, ctrl uint32) error {
 }
 
 // GetCardInfo 获取门禁设备下的卡信息
+// uid 用户ID 由NetLoginV40函数返回
 func GetCardInfo(uid int32) (cardInfo map[string]string, err error) {
 	defer func() {
 		if e := recover(); e != nil {

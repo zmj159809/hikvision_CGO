@@ -14,6 +14,7 @@ var (
 )
 
 type MessCallBack struct {
+	//此处添加正常业务逻辑处理返回事件的函数,然后再invoke的时候调用
 }
 
 func main() {
@@ -159,5 +160,5 @@ func (p *MessCallBack) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Pointer
 		//	fmt.Println("门禁主机扩展事件信息 ： ", ExtendInfo)
 		//}
 	}
-	return true
+	return true //如果return false 会导致认为处理失败重回队列，所以返回ture
 }

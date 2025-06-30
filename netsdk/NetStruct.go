@@ -299,6 +299,7 @@ const (
 
 )
 
+// 使用cgo -godefs生成对齐正确的结构体
 //--------------------登录返回信息--------------------------------//
 
 // NET_DVR_ALARMER 报警设备信息结构体。
@@ -501,7 +502,7 @@ type NET_DVR_TIME_EX struct {
 	byRes       BYTE
 }
 
-//----------------------获取报警主机防区状态参数------------------------//
+// NET_DVR_ALARMHOST_MAIN_STATUS_V51 ----------------------获取报警主机防区状态参数------------------------//
 type NET_DVR_ALARMHOST_MAIN_STATUS_V51 struct {
 	ST_dwSize                  DWORD
 	ST_bySetupAlarmStatus      [512]BYTE //防区布防状态，(最大支持512个防区查询)，0xff-无效，0-对应防区处于撤防状态，1-对应防区处于布防状态，2-对应防区处于布防中
