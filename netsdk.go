@@ -4,9 +4,9 @@ package hikvision_CGO
 
 /*
 #cgo CFLAGS:  -I./include
-//运行时链接
+//编译时链接 等效LIBRARY_PATH
 #cgo LDFLAGS: -L./lib/Linux -lhcnetsdk
-//编译时链接
+//运行时链接 等效 LD_LIBRARY_PATH
 #cgo LDFLAGS: -Wl,-rpath=./lib/Linux:./lib/Linux/HCNetSDKCom
 
 #include "HCNetSDK.h"
@@ -46,8 +46,10 @@ type IF_fMEssCallBack interface {
 //--------------------------------------注册回调函数------------------------------------
 
 // MessageCallback  处理从C库接收的报警信息，返回状态码。
+//
 // 参数说明：
 //   - lCommand: 报警命令类型
+//
 //   - pAlarmInfo: 报警信息字符串指针
 //export MessageCallback
 func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAlarmInfo *C.char, dwBufLen C.DWORD, pUser unsafe.Pointer) C.int {
@@ -177,8 +179,12 @@ func NetCleanup() {
 
 //GetDoorStatus  获取门状态
 // uid 用户ID 由NetLoginV40函数返回 pBuf 门禁主机工作状态结构体（NET_DVR_ACS_WORK_STATUS ）用于接收调用返回的信息
-//示例：var status netsdk.NET_DVR_ACS_WORK_STATUS
-//      GetDoorStatus(uid, &status)
+//
+//示例：
+//
+//     var status netsdk.NET_DVR_ACS_WORK_STATUS
+//
+//     GetDoorStatus(uid, &status)
 func GetDoorStatus(uid int32, pBuf *NET_DVR_ACS_WORK_STATUS) (err error) {
 	defer func() {
 		if e := recover(); e != nil {

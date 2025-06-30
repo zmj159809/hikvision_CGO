@@ -36,7 +36,6 @@ func main() {
 			panic(fmt.Sprintf("logout err ：%v", err))
 		}
 	}()
-
 	//注册回调函数
 	eventCB := &MessCallBack{}
 	eventCBId := hikvision_CGO.NewObjectId(eventCB)
