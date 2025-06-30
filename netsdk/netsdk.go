@@ -107,8 +107,12 @@ func NetInit(sdkLog string, ifSdkLog bool) error {
 		fmt.Printf("NET_DVR_Init failed,error code = %v\n", C.NET_DVR_GetLastError())
 		return errors.New(fmt.Sprintf("NET_DVR_Init failed,error code = %v\n", C.NET_DVR_GetLastError()))
 	}
-	C.NET_DVR_SetLogToFile(3, C.CString(sdkLog), 1)
-
+	if ifSdkLog {
+		cStr := C.CString(sdkLog)
+		defer C.free(unsafe.Pointer(cStr)) // 确保释放
+		// 日志等级， 日志目录 ，自动删除
+		C.NET_DVR_SetLogToFile(3, cStr, 1)
+	}
 	return nil
 }
 
