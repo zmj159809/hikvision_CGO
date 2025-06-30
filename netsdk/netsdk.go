@@ -38,6 +38,64 @@ type IF_fMEssCallBack interface {
 	Invoke(lCommand int, ip string, pBuf unsafe.Pointer, dwBufLen int) bool
 }
 
+//--------------------------------------注册回调函数------------------------------------
+
+// MessageCallback  处理从C库接收的报警信息，返回状态码。
+// 参数说明：
+//   - lCommand: 报警命令类型
+//   - pAlarmInfo: 报警信息字符串指针
+//export MessageCallback
+func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAlarmInfo *C.char, dwBufLen C.DWORD, pUser unsafe.Pointer) C.int {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Println("MessageCallback panic : ", e)
+		}
+	}()
+	if pAlarmer == nil || pUser == nil {
+		log.Println("pAlarmer or pUser is nil")
+		return 0
+	}
+
+	id := *(*ObjectId)(pUser)
+
+	obj := id.Get()
+	Alarm := *(*NET_DVR_ALARMER)(unsafe.Pointer(pAlarmer))
+	ip := Alarm.ST_sDeviceIP
+	// TODO: 不确定的修改
+	//var ipStr string
+	//for k, v := range ip {
+	//	if v == 0 {
+	//		ipStr = string(ip[:k])
+	//		break
+	//	}
+	//}
+
+	ipStr := C.GoString((*C.char)(unsafe.Pointer(&ip[0])))
+
+	ret := obj.Invoke(int(lCommand), ipStr, unsafe.Pointer(pAlarmInfo), int(dwBufLen))
+	if ret {
+		return 1
+	}
+	return 0
+}
+
+// SetDVRMessCallBack 设置回调函数
+func SetDVRMessCallBack(dwUser ObjectId) error {
+	if dwUser.IsNil() {
+		log.Println("dwUser is nil")
+		return errors.New("dwUser is nil")
+	}
+	ret := C.NET_DVR_SetDVRMessageCallBack_V31(C.MSGCallBack_V31(C.MessageCallback), unsafe.Pointer(&dwUser))
+	if int32(ret) == 0 {
+		//注册失败
+		return errors.New("注册回调函数失败")
+	}
+
+	return nil
+}
+
+//--------------------------------------功能性调用------------------------------------
+
 // NetInit 初始化设备和日志
 // sdkLog 日志文件路径 , ifSdkLog 是否开启日志
 // 示例： netsdk.NetInit("./",true)  日志文件名为sdk内部定义
@@ -129,50 +187,6 @@ func GetDoorStatus(uid int32, pBuf *NET_DVR_ACS_WORK_STATUS) (err error) {
 			return errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
 		}
 		return errors.New(fmt.Sprintf("get door status error，uid :%d", uid))
-	}
-
-	return nil
-}
-
-//export MessageCallback
-func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAlarmInfo *C.char, dwBufLen C.DWORD, pUser unsafe.Pointer) C.int {
-	defer func() {
-		if e := recover(); e != nil {
-			log.Println("MessageCallback panic : ", e)
-		}
-	}()
-	id := *(*ObjectId)(pUser)
-	interf := id.Get()
-	obj, ok := interf.(IF_fMEssCallBack)
-	Alarm := *(*NET_DVR_ALARMER)(unsafe.Pointer(pAlarmer))
-	ip := Alarm.ST_sDeviceIP
-	var ipStr string
-	for k, v := range ip {
-		if v == 0 {
-			ipStr = string(ip[:k])
-			break
-		}
-	}
-	if ok {
-		ret := obj.Invoke(int(lCommand), ipStr, unsafe.Pointer(pAlarmInfo), int(dwBufLen))
-		if ret {
-			return 1
-		}
-	}
-
-	return 0
-}
-
-// SetDVRMessCallBack 设置回调函数
-func SetDVRMessCallBack(dwUser ObjectId) error {
-	if dwUser.IsNil() {
-		log.Println("dwUser is nil")
-		return errors.New("dwUser is nil")
-	}
-	ret := C.NET_DVR_SetDVRMessageCallBack_V31(C.MSGCallBack_V31(C.MessageCallback), unsafe.Pointer(&dwUser))
-	if int32(ret) == 0 {
-		//注册失败
-		return errors.New("注册回调函数失败")
 	}
 
 	return nil
