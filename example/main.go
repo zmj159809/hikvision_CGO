@@ -19,7 +19,7 @@ type MessCallBack struct {
 func main() {
 	//初始化设备和日志
 	flag.Parse()
-	err := netsdk.NetInit("./") //日志路径
+	err := netsdk.NetInit("./", true) //日志路径
 	defer netsdk.NetCleanup()
 
 	//登录
@@ -63,7 +63,7 @@ func main() {
 		switch signal {
 		case "1":
 			var status netsdk.NET_DVR_ACS_WORK_STATUS
-			err := netsdk.GetDoorStatus(userID, unsafe.Pointer(&status))
+			err := netsdk.GetDoorStatus(userID, &status)
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -93,7 +93,7 @@ func main() {
 
 		case "4":
 			var AStatus netsdk.NET_DVR_ALARMHOST_MAIN_STATUS_V51
-			err := netsdk.GetAlarmHostMainStatus(userID, unsafe.Pointer(&AStatus))
+			err := netsdk.GetAlarmHostMainStatus(userID, &AStatus)
 			if err != nil {
 				fmt.Println(err)
 			} else {
