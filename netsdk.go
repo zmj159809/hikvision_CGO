@@ -1,6 +1,6 @@
 // Package netsdk 提供用于在linux环境 golang直接调用海康的sdk。
 // 详细用法参见示例代码。
-package netsdk
+package hikvision_CGO
 
 /*
 #cgo CFLAGS:  -I./include

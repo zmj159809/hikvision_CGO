@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/zmj159809/hikvision_CGO/netsdk"
+	"github.com/zmj159809/hikvision_CGO"
 	"unsafe"
 )
 
@@ -20,18 +20,18 @@ type MessCallBack struct {
 func main() {
 	//初始化设备和日志
 	flag.Parse()
-	err := netsdk.NetInit("./", true) //日志路径
-	defer netsdk.NetCleanup()
+	err := hikvision_CGO.NetInit("./", true) //日志路径
+	defer hikvision_CGO.NetCleanup()
 
 	//登录
-	userID, err := netsdk.NetLoginV40(*ip, *username, *password)
+	userID, err := hikvision_CGO.NetLoginV40(*ip, *username, *password)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println("登陆成功，userID ： ", userID)
 	defer func() {
-		err = netsdk.NetLogout(userID)
+		err = hikvision_CGO.NetLogout(userID)
 		if err != nil {
 			panic(fmt.Sprintf("logout err ：%v", err))
 		}
@@ -39,9 +39,9 @@ func main() {
 
 	//注册回调函数
 	eventCB := &MessCallBack{}
-	eventCBId := netsdk.NewObjectId(eventCB)
+	eventCBId := hikvision_CGO.NewObjectId(eventCB)
 	fmt.Println(eventCBId)
-	err = netsdk.SetDVRMessCallBack(eventCBId)
+	err = hikvision_CGO.SetDVRMessCallBack(eventCBId)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -63,8 +63,8 @@ func main() {
 		_, _ = fmt.Scanln(&signal)
 		switch signal {
 		case "1":
-			var status netsdk.NET_DVR_ACS_WORK_STATUS
-			err := netsdk.GetDoorStatus(userID, &status)
+			var status hikvision_CGO.NET_DVR_ACS_WORK_STATUS
+			err := hikvision_CGO.GetDoorStatus(userID, &status)
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -77,14 +77,14 @@ func main() {
 			_, _ = fmt.Scanln(&doorIndex)
 			fmt.Println("请选择操(0- 关闭，1- 打开，2 -常开，3- 常关)")
 			_, _ = fmt.Scanln(&ctrl)
-			err := netsdk.ControlDoor(userID, doorIndex, ctrl)
+			err := hikvision_CGO.ControlDoor(userID, doorIndex, ctrl)
 			if err != nil {
 				fmt.Println(err)
 			} else {
 				fmt.Println("执行操作成功")
 			}
 		case "3":
-			cardInfo, err := netsdk.GetCardInfo(userID)
+			cardInfo, err := hikvision_CGO.GetCardInfo(userID)
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -93,8 +93,8 @@ func main() {
 			}
 
 		case "4":
-			var AStatus netsdk.NET_DVR_ALARMHOST_MAIN_STATUS_V51
-			err := netsdk.GetAlarmHostMainStatus(userID, &AStatus)
+			var AStatus hikvision_CGO.NET_DVR_ALARMHOST_MAIN_STATUS_V51
+			err := hikvision_CGO.GetAlarmHostMainStatus(userID, &AStatus)
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -105,7 +105,7 @@ func main() {
 			}
 		case "5":
 			//布防
-			DefenceId, err := netsdk.DoDefence(userID)
+			DefenceId, err := hikvision_CGO.DoDefence(userID)
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -116,7 +116,7 @@ func main() {
 		case "q":
 			//撤防
 			for _, v := range DefenceIds {
-				netsdk.CloseDefence(v)
+				hikvision_CGO.CloseDefence(v)
 			}
 			DefenceIds = make([]int32, 0)
 			fmt.Println("退出成功")
@@ -131,8 +131,8 @@ func main() {
 func (p *MessCallBack) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Pointer, dwBufLen int) bool {
 
 	fmt.Println(lCommand, ip, pAlarmInfo, dwBufLen)
-	if lCommand == netsdk.COMM_ALARM_ACS {
-		AlarmInfo := *(*netsdk.NET_DVR_ACS_ALARM_INFO)(pAlarmInfo)
+	if lCommand == hikvision_CGO.COMM_ALARM_ACS {
+		AlarmInfo := *(*hikvision_CGO.NET_DVR_ACS_ALARM_INFO)(pAlarmInfo)
 		fmt.Println(AlarmInfo)
 		fmt.Println("门禁主机事件")
 		fmt.Println("发生时间:",

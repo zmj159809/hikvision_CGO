@@ -1,4 +1,4 @@
-package netsdk
+package hikvision_CGO
 
 import (
 	"log"
