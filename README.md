@@ -1,8 +1,130 @@
-# 说明
+# 海康威视门禁 CGO SDK
 
-此代码为海康门禁CGO版本的接口开发
+[![Go Version](https://img.shields.io/badge/Go-1.16+-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux-lightgrey.svg)](https://www.linux.org/)
 
-### 更新记录
+这是一个用于 Go 语言的海康威视门禁系统 CGO SDK，支持门禁设备的连接、控制、状态查询和事件监听。
+
+## 功能特性
+
+- 🔐 设备登录/登出管理
+- 🚪 门禁状态实时查询
+- 🎮 门禁控制（开门/关门/常开/常关）
+- 💳 卡信息查询和管理
+- 🛡️ 布防/撤防功能
+- 🔔 实时事件监听和回调
+- 📊 防区状态查询
+- 📝 完善的日志记录
+- 🔧 统一的错误处理
+
+## 环境要求
+
+- Go 1.16 或更高版本
+- Linux 操作系统
+- 海康威视门禁设备
+- 海康威视 NetSDK 库文件
+
+## 依赖包
+
+```bash
+go get go.uber.org/zap
+go get gopkg.in/natefinch/lumberjack.v2
+```
+
+## 快速开始
+
+### 1. 安装
+
+```bash
+go get github.com/zmj159809/hikvision_CGO
+```
+
+### 2. 基本使用
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    "unsafe"
+    
+    "github.com/zmj159809/hikvision_CGO"
+)
+
+func main() {
+    // 初始化 SDK
+    err := hikvision_CGO.NetInit("./logs/", true)
+    if err != nil {
+        log.Fatal("SDK 初始化失败:", err)
+    }
+    defer hikvision_CGO.NetCleanup()
+    
+    // 登录设备
+    userID, err := hikvision_CGO.NetLoginV40("192.168.1.100", "admin", "password")
+    if err != nil {
+        log.Fatal("登录失败:", err)
+    }
+    defer hikvision_CGO.NetLogout(userID)
+    
+    // 查询门状态
+    var status hikvision_CGO.NET_DVR_ACS_WORK_STATUS
+    err = hikvision_CGO.GetDoorStatus(userID, &status)
+    if err != nil {
+        log.Fatal("获取门状态失败:", err)
+    }
+    
+    fmt.Printf("门状态: %v\n", status.ST_byMagneticStatus)
+    
+    // 控制门
+    err = hikvision_CGO.ControlDoor(userID, 0, hikvision_CGO.DoorOpen)
+    if err != nil {
+        log.Fatal("控制门失败:", err)
+    }
+    
+    fmt.Println("门已打开")
+}
+```
+
+### 3. 事件监听
+
+```go
+type EventHandler struct{}
+
+func (e *EventHandler) Invoke(lCommand int, ip string, pAlarmInfo unsafe.Pointer, dwBufLen int) bool {
+    if lCommand == hikvision_CGO.COMM_ALARM_ACS {
+        alarmInfo := *(*hikvision_CGO.NET_DVR_ACS_ALARM_INFO)(pAlarmInfo)
+        fmt.Printf("收到门禁事件: %s\n", alarmInfo.ST_dwMajor.GetMajorString())
+    }
+    return true
+}
+
+func main() {
+    // ... 初始化和登录代码 ...
+    
+    // 注册事件回调
+    eventHandler := &EventHandler{}
+    eventID := hikvision_CGO.NewObjectId(eventHandler)
+    
+    err := hikvision_CGO.SetDVRMessCallBack(eventID)
+    if err != nil {
+        log.Fatal("注册回调失败:", err)
+    }
+    
+    // 布防
+    defenceID, err := hikvision_CGO.DoDefence(userID)
+    if err != nil {
+        log.Fatal("布防失败:", err)
+    }
+    defer hikvision_CGO.CloseDefence(defenceID)
+    
+    // 等待事件...
+    select {}
+}
+```
+
+## 更新记录
 
 #### v 0.0.1
 

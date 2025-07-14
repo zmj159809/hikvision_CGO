@@ -34,9 +34,66 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"log"
 	"unsafe"
+
+	"github.com/zmj159809/hikvision_CGO/logger"
 )
+
+// 常量定义
+const (
+	// 默认端口号
+	DefaultPort = 8000
+
+	// 门控制命令
+	DoorClose       = 0 // 关闭
+	DoorOpen        = 1 // 打开
+	DoorAlwaysOpen  = 2 // 常开
+	DoorAlwaysClose = 3 // 常关
+
+	// 远程配置返回状态
+	RemoteConfigSuccess    = 1000 // 成功
+	RemoteConfigProcessing = 1001 // 处理中
+	RemoteConfigFinished   = 1002 // 完成
+	RemoteConfigFailed     = 1003 // 失败
+
+	// 布防类型
+	DeployTypeRealtime = 1 // 实时布防
+
+	// 日志级别
+	SDKLogLevelInfo = 3
+
+	// 卡信息缓冲区大小
+	CardInfoBufferSize = 1300
+
+	// 特殊值
+	AllChannel = 0xFFFFFFF  // 所有通道
+	AllCards   = 0xffffffff // 所有卡片
+)
+
+// 错误类型定义
+type SDKError struct {
+	Operation string
+	UID       int32
+	Code      int64
+	Message   string
+}
+
+func (e *SDKError) Error() string {
+	if e.UID > 0 {
+		return fmt.Sprintf("%s失败 [UID:%d] [错误码:%d] %s", e.Operation, e.UID, e.Code, e.Message)
+	}
+	return fmt.Sprintf("%s失败 [错误码:%d] %s", e.Operation, e.Code, e.Message)
+}
+
+// 创建SDK错误
+func newSDKError(operation string, uid int32, code int64, message string) *SDKError {
+	return &SDKError{
+		Operation: operation,
+		UID:       uid,
+		Code:      code,
+		Message:   message,
+	}
+}
 
 // IF_fMEssCallBack 回调函数结构体
 type IF_fMEssCallBack interface {
@@ -48,18 +105,20 @@ type IF_fMEssCallBack interface {
 // MessageCallback  处理从C库接收的报警信息，返回状态码。
 //
 // 参数说明：
+//
 //   - lCommand: 报警命令类型
 //
 //   - pAlarmInfo: 报警信息字符串指针
+//
 //export MessageCallback
 func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAlarmInfo *C.char, dwBufLen C.DWORD, pUser unsafe.Pointer) C.int {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("MessageCallback panic : ", e)
+			logger.Errorf("MessageCallback panic : %v", e)
 		}
 	}()
 	if pAlarmer == nil || pUser == nil {
-		log.Println("pAlarmer or pUser is nil")
+		logger.ErrorArgs("pAlarmer or pUser is nil")
 		return 0
 	}
 
@@ -81,7 +140,7 @@ func MessageCallback(lCommand C.int, pAlarmer *C.struct_tagNET_DVR_ALARMER, pAla
 // SetDVRMessCallBack 设置回调函数
 func SetDVRMessCallBack(dwUser ObjectId) error {
 	if dwUser.IsNil() {
-		log.Println("dwUser is nil")
+		logger.ErrorArgs("dwUser is nil")
 		return errors.New("dwUser is nil")
 	}
 	ret := C.NET_DVR_SetDVRMessageCallBack_V31(C.MSGCallBack_V31(C.MessageCallback), unsafe.Pointer(&dwUser))
@@ -99,19 +158,32 @@ func SetDVRMessCallBack(dwUser ObjectId) error {
 // sdkLog 日志文件路径 , ifSdkLog 是否开启日志
 // 示例： netsdk.NetInit("./",true)  日志文件名为sdk内部定义
 func NetInit(sdkLog string, ifSdkLog bool) error {
+	// 初始化自定义日志系统
+	if err := logger.Init(logger.DefaultConfig()); err != nil {
+		return fmt.Errorf("初始化日志系统失败: %v", err)
+	}
+
+	logger.Info("开始初始化海康威视SDK")
 
 	//初始化资源
 	ret := C.NET_DVR_Init()
 	if int(ret) != 1 {
-		fmt.Printf("NET_DVR_Init failed,error code = %v\n", C.NET_DVR_GetLastError())
-		return errors.New(fmt.Sprintf("NET_DVR_Init failed,error code = %v\n", C.NET_DVR_GetLastError()))
+		errCode := C.NET_DVR_GetLastError()
+		errMsg := fmt.Sprintf("NET_DVR_Init failed, error code = %v", errCode)
+		logger.Error(errMsg)
+		return errors.New(errMsg)
 	}
+
+	logger.Info("海康威视SDK初始化成功")
+
 	if ifSdkLog {
 		cStr := C.CString(sdkLog)
 		defer C.free(unsafe.Pointer(cStr)) // 确保释放
 		// 日志等级， 日志目录 ，自动删除
-		C.NET_DVR_SetLogToFile(3, cStr, 1)
+		C.NET_DVR_SetLogToFile(SDKLogLevelInfo, cStr, 1)
+		logger.Infof("SDK日志已启用，路径: %s", sdkLog)
 	}
+
 	return nil
 }
 
@@ -122,7 +194,7 @@ func NetLoginV40(deviceIp, username, password string) (int32, error) {
 	var userLoginInfo C.NET_DVR_USER_LOGIN_INFO
 	var deviceInfo C.NET_DVR_DEVICEINFO_V40
 
-	userLoginInfo.wPort = 8000 // your device port,default 8000
+	userLoginInfo.wPort = DefaultPort // your device port,default 8000
 
 	pUsername := C.CBytes([]byte(username))
 	defer C.free(pUsername)
@@ -141,22 +213,24 @@ func NetLoginV40(deviceIp, username, password string) (int32, error) {
 	uid := C.NET_DVR_Login_V40((C.LPNET_DVR_USER_LOGIN_INFO)(&userLoginInfo), (C.LPNET_DVR_DEVICEINFO_V40)(&deviceInfo))
 
 	if int32(uid) < 0 {
-		if err := isErr("Login"); err != nil {
-			return -1, errors.New(fmt.Sprintf("ip: %s 登录失败,原因%v", deviceIp, err.Error()))
+		if err := getLastError("Login"); err != nil {
+			return -1, fmt.Errorf("ip: %s 登录失败, 原因: %v", deviceIp, err)
 		}
-		return -1, errors.New(fmt.Sprintf("ip: %s 登录失败", deviceIp))
+		return -1, fmt.Errorf("ip: %s 登录失败", deviceIp)
 	}
 	return int32(uid), nil
 }
 
-// isErr  获取上一个发生的错误
-// operation  操作名称
-// 示例：isErr("Login")
-func isErr(operation string) error {
+// getLastError 获取上一个发生的错误
+// operation 操作名称
+// uid 用户ID（可选）
+func getLastError(operation string, uid ...int32) error {
 	errno := int64(C.NET_DVR_GetLastError())
 	if errno > 0 {
-		reMsg := fmt.Sprintf("%s失败,失败代码号：%d", operation, errno)
-		return errors.New(reMsg)
+		if len(uid) > 0 {
+			return newSDKError(operation, uid[0], errno, fmt.Sprintf("SDK错误码: %d", errno))
+		}
+		return newSDKError(operation, 0, errno, fmt.Sprintf("SDK错误码: %d", errno))
 	}
 	return nil
 }
@@ -166,7 +240,7 @@ func isErr(operation string) error {
 // 示例：NetLogout(uid)
 func NetLogout(uid int32) error {
 	C.NET_DVR_Logout_V30(C.LONG(uid))
-	if err := isErr("Logout"); err != nil {
+	if err := getLastError("Logout", uid); err != nil {
 		return err
 	}
 	return nil
@@ -177,29 +251,29 @@ func NetCleanup() {
 	C.NET_DVR_Cleanup()
 }
 
-//GetDoorStatus  获取门状态
+// GetDoorStatus  获取门状态
 // uid 用户ID 由NetLoginV40函数返回 pBuf 门禁主机工作状态结构体（NET_DVR_ACS_WORK_STATUS ）用于接收调用返回的信息
 //
-//示例：
+// 示例：
 //
-//     var status netsdk.NET_DVR_ACS_WORK_STATUS
+//	var status netsdk.NET_DVR_ACS_WORK_STATUS
 //
-//     GetDoorStatus(uid, &status)
+//	GetDoorStatus(uid, &status)
 func GetDoorStatus(uid int32, pBuf *NET_DVR_ACS_WORK_STATUS) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("GetDoorStatus panic : ", e)
+			logger.Errorf("GetDoorStatus panic : %v", e)
 		}
 	}()
 	var lpBytesReturned C.DWORD
 	var PBuf = (C.LPVOID)(unsafe.Pointer(pBuf))
-	ret := C.NET_DVR_GetDVRConfig(C.LONG(uid), C.NET_DVR_GET_ACS_WORK_STATUS, C.LONG(0xFFFFFFF), PBuf, (C.DWORD)(unsafe.Sizeof(NET_DVR_ACS_WORK_STATUS{})), (C.LPDWORD)(&lpBytesReturned))
+	ret := C.NET_DVR_GetDVRConfig(C.LONG(uid), C.NET_DVR_GET_ACS_WORK_STATUS, C.LONG(AllChannel), PBuf, (C.DWORD)(unsafe.Sizeof(NET_DVR_ACS_WORK_STATUS{})), (C.LPDWORD)(&lpBytesReturned))
 
 	if int32(ret) == 0 {
-		if err = isErr("Get door status"); err != nil {
-			return errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		if err = getLastError("Get door status", uid); err != nil {
+			return fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 		}
-		return errors.New(fmt.Sprintf("get door status error，uid :%d", uid))
+		return fmt.Errorf("get door status error, uid: %d", uid)
 	}
 
 	return nil
@@ -210,10 +284,10 @@ func GetDoorStatus(uid int32, pBuf *NET_DVR_ACS_WORK_STATUS) (err error) {
 func DoDefence(uid int32) (int32, error) {
 	ret := C.ST_Defence(C.int(uid))
 	if int32(ret) == -1 {
-		err := isErr("布防")
+		err := getLastError("布防", uid)
 		return int32(ret), err
 	}
-	log.Println("布防成功")
+	logger.InfoArgs("布防成功")
 	return int32(ret), nil
 }
 
@@ -230,15 +304,15 @@ func CloseDefence(dId int32) {
 func ControlDoor(uid int32, DoorIndex int32, ctrl uint32) error {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("ControlDoor panic : ", e)
+			logger.Errorf("ControlDoor panic : %v", e)
 		}
 	}()
 	ret := C.NET_DVR_ControlGateway(C.LONG(uid), C.LONG(DoorIndex), C.DWORD(ctrl))
 	if int32(ret) == 0 {
-		if err := isErr("Control door"); err != nil {
-			return errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		if err := getLastError("Control door", uid); err != nil {
+			return fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 		}
-		return errors.New(fmt.Sprintf("Control door error，uid :%d", uid))
+		return fmt.Errorf("Control door error, uid: %d", uid)
 	}
 	return nil
 }
@@ -248,12 +322,12 @@ func ControlDoor(uid int32, DoorIndex int32, ctrl uint32) error {
 func GetCardInfo(uid int32) (cardInfo map[string]string, err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("GetCardInfo panic : ", e)
+			logger.Errorf("GetCardInfo panic : %v", e)
 		}
 	}()
 	var getcard NET_DVR_CARD_COND
 	getcard.ST_dwSize = DWORD(unsafe.Sizeof(NET_DVR_CARD_COND{}))
-	getcard.ST_dwCardNum = 0xffffffff
+	getcard.ST_dwCardNum = AllCards
 	cardInfo = make(map[string]string)
 
 	var CardStruct C.NET_DVR_CARD_RECORD
@@ -262,25 +336,25 @@ func GetCardInfo(uid int32) (cardInfo map[string]string, err error) {
 	//建立长连接
 	ret1 := C.NET_DVR_StartRemoteConfig(C.LONG(uid), C.NET_DVR_GET_CARD, (C.LPVOID)(unsafe.Pointer(&getcard)), C.DWORD(unsafe.Sizeof(NET_DVR_CARD_COND{})), nil, nil)
 	if int32(ret1) < 0 {
-		if err := isErr("StartRemoteConfig"); err != nil {
-			return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		if err := getLastError("StartRemoteConfig", uid); err != nil {
+			return cardInfo, fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 		}
-		return cardInfo, errors.New(fmt.Sprintf("GetCard Info error，uid :%d", uid))
+		return cardInfo, fmt.Errorf("GetCard Info error, uid: %d", uid)
 	}
 
 	//循环获取卡数据
 	for {
-		ret2 := int32(C.NET_DVR_GetNextRemoteConfig(ret1, unsafe.Pointer(&CardStruct), C.DWORD(1300)))
+		ret2 := int32(C.NET_DVR_GetNextRemoteConfig(ret1, unsafe.Pointer(&CardStruct), C.DWORD(CardInfoBufferSize)))
 		//fmt.Println(*(*NET_DVR_CARD_RECORD)(unsafe.Pointer(&CardStruct)))
 		//fmt.Println(unsafe.Sizeof(NET_DVR_CARD_RECORD{}))
 		//fmt.Println("NET_DVR_GetNextRemoteConfig 返回结果",ret2)
 		if int64(ret2) < 0 {
-			if err := isErr("GetNextRemoteConfig1"); err != nil {
-				return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+			if err := getLastError("GetNextRemoteConfig1", uid); err != nil {
+				return cardInfo, fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 			}
-			return cardInfo, errors.New(fmt.Sprintf("GetCard Info error，uid :%d", uid))
+			return cardInfo, fmt.Errorf("GetCard Info error, uid: %d", uid)
 		}
-		if ret2 == 1000 {
+		if ret2 == RemoteConfigSuccess {
 			cardStruct = *(*NET_DVR_CARD_RECORD)(unsafe.Pointer(&CardStruct))
 			for k, v := range cardStruct.byCardNo {
 				if v == 0 {
@@ -288,29 +362,29 @@ func GetCardInfo(uid int32) (cardInfo map[string]string, err error) {
 					break
 				}
 			}
-			fmt.Println("get card info :cardNo:", string(cardStruct.byCardNo[:]), "|name : ", string(cardStruct.byName[:]))
+			logger.Infof("get card info :cardNo: %s |name : %s", string(cardStruct.byCardNo[:]), string(cardStruct.byName[:]))
 			continue
 		}
-		if ret2 == 1001 {
+		if ret2 == RemoteConfigProcessing {
 			continue
 		}
-		if ret2 == 1002 {
+		if ret2 == RemoteConfigFinished {
 			ret3 := C.NET_DVR_StopRemoteConfig(ret1)
 			if int32(ret3) == 0 {
-				if err := isErr("GetNextRemoteConfig"); err != nil {
-					return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+				if err := getLastError("GetNextRemoteConfig", uid); err != nil {
+					return cardInfo, fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 				}
-				return cardInfo, errors.New(fmt.Sprintf("Control door error，uid :%d", uid))
+				return cardInfo, fmt.Errorf("Control door error, uid: %d", uid)
 			}
 			return cardInfo, nil
 		}
-		if ret2 == 1003 {
+		if ret2 == RemoteConfigFailed {
 			ret3 := C.NET_DVR_StopRemoteConfig(ret1)
 			if int32(ret3) == 0 {
-				if err := isErr("GetNextRemoteConfig"); err != nil {
-					return cardInfo, errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+				if err := getLastError("GetNextRemoteConfig", uid); err != nil {
+					return cardInfo, fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 				}
-				return cardInfo, errors.New(fmt.Sprintf("Control door error，uid :%d", uid))
+				return cardInfo, fmt.Errorf("Control door error, uid: %d", uid)
 			}
 			return cardInfo, nil
 		}
@@ -325,18 +399,18 @@ func GetCardInfo(uid int32) (cardInfo map[string]string, err error) {
 func GetAlarmHostMainStatus(uid int32, status *NET_DVR_ALARMHOST_MAIN_STATUS_V51) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			log.Println("GetAlarmHostMainStatus panic : ", e)
+			logger.Errorf("GetAlarmHostMainStatus panic : %v", e)
 		}
 	}()
 	var AlarmHostStatus = (C.LPVOID)(unsafe.Pointer(status))
 	var lpBytesReturned C.DWORD
-	ret := C.NET_DVR_GetDVRConfig(C.LONG(uid), C.NET_DVR_GET_ACS_WORK_STATUS, C.LONG(0xFFFFFFF), AlarmHostStatus, (C.DWORD)(unsafe.Sizeof(NET_DVR_ALARMHOST_MAIN_STATUS_V51{})), (C.LPDWORD)(&lpBytesReturned))
+	ret := C.NET_DVR_GetDVRConfig(C.LONG(uid), C.NET_DVR_GET_ACS_WORK_STATUS, C.LONG(AllChannel), AlarmHostStatus, (C.DWORD)(unsafe.Sizeof(NET_DVR_ALARMHOST_MAIN_STATUS_V51{})), (C.LPDWORD)(&lpBytesReturned))
 
 	if int32(ret) == 0 {
-		if err = isErr("Get door status"); err != nil {
-			return errors.New(fmt.Sprintf("uid:[%d] 失败,原因%v", uid, err.Error()))
+		if err := getLastError("Get door status", uid); err != nil {
+			return fmt.Errorf("uid:[%d] 失败,原因: %v", uid, err)
 		}
-		return errors.New(fmt.Sprintf("get door status error，uid :%d", uid))
+		return fmt.Errorf("get door status error, uid: %d", uid)
 	}
 	return nil
 }

@@ -1,7 +1,6 @@
 package hikvision_CGO
 
 import (
-	"log"
 	"sync"
 )
 
@@ -14,8 +13,6 @@ var refs struct {
 }
 
 func init() {
-	log.SetFlags(log.Lshortfile | log.LstdFlags)
-
 	refs.Lock()
 	defer refs.Unlock()
 
@@ -24,7 +21,7 @@ func init() {
 }
 
 // NewObjectId 本质是个id分配器,
-//此处的id并非设备返回的用户id，而是传入到回调函数里面的自定义id,用于注册对应回调函数时，调用的不同id使用不同的函数方法
+// 此处的id并非设备返回的用户id，而是传入到回调函数里面的自定义id,用于注册对应回调函数时，调用的不同id使用不同的函数方法
 // obj 是 IF_fMEssCallBack 接口的实现
 func NewObjectId(obj IF_fMEssCallBack) ObjectId {
 	refs.Lock()
